@@ -4,6 +4,7 @@
 
 #include "Attribute/HealthAttributeSet.h"
 #include "Attribute/CombatAttributeSet.h"
+#include "HealthExecutionModifier.h"
 
 #include "GameplayEffectTypes.h"
 
@@ -53,14 +54,20 @@ void UDamageExecution::Execute_Implementation(
 	EvaluateParameters.SourceTags = SourceTags;
 	EvaluateParameters.TargetTags = TargetTags;
 
-	auto BaseDamage{ 0.0f };
-	ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().BaseDamageDef, EvaluateParameters, BaseDamage);
+	auto Damage{ 0.0f };
+	ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().BaseDamageDef, EvaluateParameters, Damage);
 
-	const float DamageDone{ ModifiyDamage(BaseDamage, ExecutionParams) };
-
-	if (DamageDone > 0.0f)
+	for (const auto& Modifier : Modifiers)
 	{
-		OutExecutionOutput.AddOutputModifier(FGameplayModifierEvaluatedData(UHealthAttributeSet::GetDamageAttribute(), EGameplayModOp::Additive, DamageDone));
+		if (Modifier)
+		{
+			Damage = Modifier->ModifierExecution(Damage, ExecutionParams);
+		}
+	}
+
+	if (Damage > 0.0f)
+	{
+		OutExecutionOutput.AddOutputModifier(FGameplayModifierEvaluatedData(UHealthAttributeSet::GetDamageAttribute(), EGameplayModOp::Additive, Damage));
 	}
 
 #endif // #if WITH_SERVER_CODE

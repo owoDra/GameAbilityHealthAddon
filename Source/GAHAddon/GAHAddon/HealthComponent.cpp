@@ -107,7 +107,7 @@ void UHealthComponent::InitializeWithAbilitySystem()
 	auto* Owner{ GetOwner() };
 	check(Owner);
 
-	auto* NewASC{ UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(GetOwner()) };
+	auto* NewASC{ UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(Owner) };
 
 	if (AbilitySystemComponent)
 	{
@@ -272,7 +272,7 @@ void UHealthComponent::OnActorInitStateChanged(const FActorInitStateChangedParam
 	{
 		if ((Params.FeatureState == TAG_InitState_DataInitialized) || (Params.FeatureState == TAG_InitState_GameplayReady))
 		{
-			InitializeWithAbilitySystem();
+			CheckDefaultInitialization();
 		}
 	}
 }

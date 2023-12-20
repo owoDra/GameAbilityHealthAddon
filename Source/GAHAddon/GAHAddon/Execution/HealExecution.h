@@ -18,6 +18,13 @@ public:
 	UHealExecution();
 
 protected:
+	//
+	// List of additional calculation processes
+	//
+	UPROPERTY(EditDefaultsOnly, Instanced)
+	TArray<TObjectPtr<UHealthExecutionModifier>> Modifiers;
+
+protected:
 	virtual void Execute_Implementation(const FGameplayEffectCustomExecutionParameters& ExecutionParams, FGameplayEffectCustomExecutionOutput& OutExecutionOutput) const override;
 
 };
@@ -32,6 +39,13 @@ class GAHADDON_API UHealShieldExecution : public UGameplayEffectExecutionCalcula
 	GENERATED_BODY()
 public:
 	UHealShieldExecution();
+
+protected:
+	//
+	// List of additional calculation processes
+	//
+	UPROPERTY(EditDefaultsOnly, Instanced)
+	TArray<TObjectPtr<UHealthExecutionModifier>> Modifiers;
 
 protected:
 	virtual void Execute_Implementation(const FGameplayEffectCustomExecutionParameters& ExecutionParams, FGameplayEffectCustomExecutionOutput& OutExecutionOutput) const override;

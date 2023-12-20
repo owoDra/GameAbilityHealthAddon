@@ -6,6 +6,8 @@
 
 #include "DamageExecution.generated.h"
 
+class UHealthExecutionModifier;
+
 
 /**
  * Exection of Gameplay Effect to inflict damage
@@ -18,13 +20,15 @@ public:
 	UDamageExecution();
 
 protected:
+	//
+	// List of additional calculation processes
+	//
+	UPROPERTY(EditDefaultsOnly, Instanced)
+	TArray<TObjectPtr<UHealthExecutionModifier>> Modifiers;
+
+protected:
 	virtual void Execute_Implementation(
 		const FGameplayEffectCustomExecutionParameters& ExecutionParams, 
 		FGameplayEffectCustomExecutionOutput& OutExecutionOutput) const override;
-
-	/**
-	 * Exection of Gameplay Effect to inflict damage
-	 */
-	virtual float ModifiyDamage(float BaseDamage, const FGameplayEffectCustomExecutionParameters& ExecutionParams) const { return BaseDamage; }
 
 };

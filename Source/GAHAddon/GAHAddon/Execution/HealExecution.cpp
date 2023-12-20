@@ -4,6 +4,7 @@
 
 #include "Attribute/HealthAttributeSet.h"
 #include "Attribute/CombatAttributeSet.h"
+#include "HealthExecutionModifier.h"
 
 #include "GameplayEffectTypes.h"
 
@@ -74,14 +75,22 @@ void UHealExecution::Execute_Implementation(const FGameplayEffectCustomExecution
 	EvaluateParameters.SourceTags = SourceTags;
 	EvaluateParameters.TargetTags = TargetTags;
 
-	float BaseHeal = 0.0f;
-	ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(HealStatics().BaseHealDef, EvaluateParameters, BaseHeal);
+	auto Heal{ 0.0f };
+	ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(HealStatics().BaseHealDef, EvaluateParameters, Heal);
 
-	const float HealingDone = FMath::Max(0.0f, BaseHeal);
-
-	if (HealingDone > 0.0f)
+	for (const auto& Modifier : Modifiers)
 	{
-		OutExecutionOutput.AddOutputModifier(FGameplayModifierEvaluatedData(UHealthAttributeSet::GetHealingAttribute(), EGameplayModOp::Additive, HealingDone));
+		if (Modifier)
+		{
+			Heal = Modifier->ModifierExecution(Heal, ExecutionParams);
+		}
+	}
+
+	Heal = FMath::Max(0.0f, Heal);
+
+	if (Heal > 0.0f)
+	{
+		OutExecutionOutput.AddOutputModifier(FGameplayModifierEvaluatedData(UHealthAttributeSet::GetHealingAttribute(), EGameplayModOp::Additive, Heal));
 	}
 
 #endif // #if WITH_SERVER_CODE
@@ -110,14 +119,22 @@ void UHealShieldExecution::Execute_Implementation(const FGameplayEffectCustomExe
 	EvaluateParameters.SourceTags = SourceTags;
 	EvaluateParameters.TargetTags = TargetTags;
 
-	float BaseHeal = 0.0f;
-	ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(HealShieldStatics().BaseHealDef, EvaluateParameters, BaseHeal);
+	auto Heal{ 0.0f };
+	ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(HealShieldStatics().BaseHealDef, EvaluateParameters, Heal);
 
-	const float HealingDone = FMath::Max(0.0f, BaseHeal);
-
-	if (HealingDone > 0.0f)
+	for (const auto& Modifier : Modifiers)
 	{
-		OutExecutionOutput.AddOutputModifier(FGameplayModifierEvaluatedData(UHealthAttributeSet::GetHealingShieldAttribute(), EGameplayModOp::Additive, HealingDone));
+		if (Modifier)
+		{
+			Heal = Modifier->ModifierExecution(Heal, ExecutionParams);
+		}
+	}
+
+	Heal = FMath::Max(0.0f, Heal);
+
+	if (Heal > 0.0f)
+	{
+		OutExecutionOutput.AddOutputModifier(FGameplayModifierEvaluatedData(UHealthAttributeSet::GetHealingShieldAttribute(), EGameplayModOp::Additive, Heal));
 	}
 
 #endif // #if WITH_SERVER_CODE
