@@ -2,8 +2,7 @@
 
 #pragma once
 
-#include "Components/ActorComponent.h"
-#include "Components/GameFrameworkInitStateInterface.h"
+#include "Component/GFCActorComponent.h"
 
 #include "HealthComponent.generated.h"
 
@@ -42,9 +41,7 @@ enum class EDeathState : uint8
  * Components that manage actor health, shield, death state and more.
  */
 UCLASS(Meta=(BlueprintSpawnableComponent))
-class GAHADDON_API UHealthComponent
-	: public UActorComponent
-	, public IGameFrameworkInitStateInterface
+class GAHADDON_API UHealthComponent : public UGFCActorComponent
 {
 	GENERATED_BODY()
 public:
@@ -68,24 +65,21 @@ protected:
 	TObjectPtr<const UCombatAttributeSet> CombatSet{ nullptr };
 
 protected:
-	virtual void OnRegister() override;
-	virtual void OnUnregister() override;
-	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
-protected:
 	void InitializeWithAbilitySystem();
 	void UninitializeFromAbilitySystem();
 	void ClearGameplayTags();
 
 public:
 	virtual FName GetFeatureName() const override { return NAME_ActorFeatureName; }
-	virtual bool CanChangeInitState(UGameFrameworkComponentManager* Manager, FGameplayTag CurrentState, FGameplayTag DesiredState) const override;
-	virtual void HandleChangeInitState(UGameFrameworkComponentManager* Manager, FGameplayTag CurrentState, FGameplayTag DesiredState) override;
 	virtual void OnActorInitStateChanged(const FActorInitStateChangedParams& Params) override;
-	virtual void CheckDefaultInitialization() override;
 
+protected:
+	virtual bool CanChangeInitStateToDataInitialized(UGameFrameworkComponentManager* Manager) const override;
+	virtual void HandleChangeInitStateToDataInitialized(UGameFrameworkComponentManager* Manager) override;
 
+	
 protected:
 	//
 	// Current health data

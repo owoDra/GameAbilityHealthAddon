@@ -53,50 +53,9 @@ void UHealthComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 }
 
 
-void UHealthComponent::OnRegister()
-{
-	Super::OnRegister();
-
-	// No more than two of these components should be added to a Actor.
-
-	TArray<UActorComponent*> Components;
-	GetOwner()->GetComponents(UHealthComponent::StaticClass(), Components);
-	ensureAlwaysMsgf((Components.Num() == 1), TEXT("Only one HealthComponent should exist on [%s]."), *GetNameSafe(GetOwner()));
-
-	// Register this component in the GameFrameworkComponentManager.
-
-	RegisterInitStateFeature();
-}
-
-void UHealthComponent::OnUnregister()
-{
-	UninitializeFromAbilitySystem();
-
-	Super::OnUnregister();
-}
-
-void UHealthComponent::BeginPlay()
-{
-	Super::BeginPlay();
-
-	// Start listening for changes in the initialization state of all features 
-	// related to the Pawn that owns this component.
-
-	BindOnActorInitStateChanged(NAME_None, FGameplayTag(), false);
-
-	// Change the initialization state of this component to [Spawned]
-
-	ensure(TryToChangeInitState(TAG_InitState_Spawned));
-
-	// Check if initialization process can continue
-
-	CheckDefaultInitialization();
-}
-
 void UHealthComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	UninitializeFromAbilitySystem();
-	UnregisterInitStateFeature();
 
 	Super::EndPlay(EndPlayReason);
 }
@@ -155,7 +114,7 @@ void UHealthComponent::InitializeWithAbilitySystem()
 	HealthSet->OnDamaged.AddUObject(this, &ThisClass::HandleOnDamaged);
 	HealthSet->OnHealed.AddUObject(this, &ThisClass::HandleOnHealed);
 
-	CheckDefaultInitialization();
+	ApplyHealthData();
 }
 
 void UHealthComponent::UninitializeFromAbilitySystem()
@@ -195,99 +154,39 @@ void UHealthComponent::ClearGameplayTags()
 }
 
 
-bool UHealthComponent::CanChangeInitState(UGameFrameworkComponentManager* Manager, FGameplayTag CurrentState, FGameplayTag DesiredState) const
-{
-	check(Manager);
-
-	auto* Owner{ GetOwner() };
-
-	/**
-	 * [InitState None] -> [InitState Spawned]
-	 */
-	if (!CurrentState.IsValid() && DesiredState == TAG_InitState_Spawned)
-	{
-		if (Owner != nullptr)
-		{
-			return true;
-		}
-	}
-
-	/**
-	 * [InitState Spawned] -> [InitState DataAvailable]
-	 */
-	else if (CurrentState == TAG_InitState_Spawned && DesiredState == TAG_InitState_DataAvailable)
-	{
-		return Manager->HasFeatureReachedInitState(Owner, UGAEAbilitySystemComponent::NAME_ActorFeatureName, TAG_InitState_DataInitialized);
-	}
-
-	/**
-	 * [InitState DataAvailable] -> [InitState DataInitialized]
-	 */
-	else if (CurrentState == TAG_InitState_DataAvailable && DesiredState == TAG_InitState_DataInitialized)
-	{
-		if (HealthData && AbilitySystemComponent)
-		{
-			return true;
-		}
-	}
-
-	/**
-	 * [InitState DataInitialized] -> [InitState GameplayReady]
-	 */
-	else if (CurrentState == TAG_InitState_DataInitialized && DesiredState == TAG_InitState_GameplayReady)
-	{
-		return true;
-	}
-
-	return false;
-}
-
-void UHealthComponent::HandleChangeInitState(UGameFrameworkComponentManager* Manager, FGameplayTag CurrentState, FGameplayTag DesiredState)
-{
-	UE_LOG(LogGAHA, Log, TEXT("[%s] Health Component InitState Reached: %s"),
-		GetOwner()->HasAuthority() ? TEXT("SERVER") : TEXT("CLIENT"), *DesiredState.GetTagName().ToString());
-
-	/**
-	 * [InitState Spawned] -> [InitState DataAvailable]
-	 */
-	if (CurrentState == TAG_InitState_Spawned && DesiredState == TAG_InitState_DataAvailable)
-	{
-		InitializeWithAbilitySystem();
-	}
-
-	/**
-	 * [InitState DataAvailable] -> [InitState DataInitialized]
-	 */
-	else if (CurrentState == TAG_InitState_DataAvailable && DesiredState == TAG_InitState_DataInitialized)
-	{
-		ApplyHealthData();
-	}
-}
-
 void UHealthComponent::OnActorInitStateChanged(const FActorInitStateChangedParams& Params)
 {
+	Super::OnActorInitStateChanged(Params);
+
 	// Wait for initialization of AbilitySystemCompoenet
 
 	if (Params.FeatureName == UGAEAbilitySystemComponent::NAME_ActorFeatureName)
 	{
-		if ((Params.FeatureState == TAG_InitState_DataInitialized) || (Params.FeatureState == TAG_InitState_GameplayReady))
+		if ((Params.FeatureState == TAG_InitState_DataInitialized))
 		{
 			CheckDefaultInitialization();
 		}
 	}
 }
 
-void UHealthComponent::CheckDefaultInitialization()
+bool UHealthComponent::CanChangeInitStateToDataInitialized(UGameFrameworkComponentManager* Manager) const
 {
-	static const TArray<FGameplayTag> StateChain
+	if (!HealthData)
 	{
-		TAG_InitState_Spawned,
-		TAG_InitState_DataAvailable,
-		TAG_InitState_DataInitialized,
-		TAG_InitState_GameplayReady
-	};
+		return false;
+	}
 
-	ContinueInitStateChain(StateChain);
+	if (!Manager->HasFeatureReachedInitState(GetOwner(), UGAEAbilitySystemComponent::NAME_ActorFeatureName, TAG_InitState_DataInitialized))
+	{
+		return false;
+	}
+
+	return true;
+}
+
+void UHealthComponent::HandleChangeInitStateToDataInitialized(UGameFrameworkComponentManager* Manager)
+{
+	InitializeWithAbilitySystem();
 }
 
 

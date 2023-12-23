@@ -26,6 +26,7 @@ public class GAHAddon : ModuleRules
                 "ModularGameplay",
                 "GameplayTags",
                 "GameplayAbilities",
+                "GFCore",
             }
         );
 
@@ -33,7 +34,6 @@ public class GAHAddon : ModuleRules
         PrivateDependencyModuleNames.AddRange(
             new string[]
             {
-                "GFCore",
                 "GAExt",
             }
         );
