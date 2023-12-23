@@ -5,11 +5,15 @@
 #include "Attribute/HealthAttributeSet.h"
 #include "Attribute/CombatAttributeSet.h"
 #include "HealthData.h"
+#include "Message/HealthMessageTypes.h"
 #include "GameplayTag/GAHATags_Status.h"
+#include "GameplayTag/GAHATags_Message.h"
+#include "GameplayTag/GAHATags_GameplayEvent.h"
 #include "GAHAddonLogs.h"
 
 #include "GAEAbilitySystemComponent.h"
 
+#include "Message/GameplayMessageSubsystem.h"
 #include "InitState/InitStateTags.h"
 
 #include "AbilitySystemGlobals.h"
@@ -245,6 +249,38 @@ void UHealthComponent::SetHealthData(const UHealthData* NewHealthData)
 }
 
 
+void UHealthComponent::AddDamageCauser(AActor* Causer, float Damage)
+{
+	auto& TotalDamage{ DamageCauserHistory.FindOrAdd(Causer) };
+	TotalDamage += Damage;
+}
+
+void UHealthComponent::ClearDamageCauserHistory()
+{
+	DamageCauserHistory.Empty();
+}
+
+AActor* UHealthComponent::GetTopAssistCauser(AActor* FinalCauser) const
+{
+	AActor* Result{ nullptr };
+	auto TopDamage{ 0.0f };
+
+	for (const auto& KVP : DamageCauserHistory)
+	{
+		auto* Causer{ KVP.Key.Get() };
+		const auto& Damage{ KVP.Value };
+
+		if (Causer && (TopDamage < Damage) && (FinalCauser != Causer))
+		{
+			TopDamage = Damage;
+			Result = Causer;
+		}
+	}
+
+	return Result;
+}
+
+
 void UHealthComponent::OnRep_DeathState()
 {
 	switch (DeathState)
@@ -358,17 +394,113 @@ void UHealthComponent::HandleMaxShieldChanged(const FOnAttributeChangeData& Chan
 
 void UHealthComponent::HandleOutOfHealth(AActor* DamageInstigator, AActor* DamageCauser, const FGameplayEffectSpec& DamageEffectSpec, float DamageMagnitude)
 {
+	auto* Assister{ GetTopAssistCauser(DamageCauser) };
+
+	// Sends a GameplayEvent to the AbilitySystemComponent of the Actor that owns this component.
+
+	if (AbilitySystemComponent)
+	{
+		FGameplayEventData Payload;
+		Payload.EventTag		= TAG_Event_OutOfHealth;
+		Payload.Instigator		= DamageInstigator;
+		Payload.Target			= AbilitySystemComponent->GetAvatarActor();
+		Payload.OptionalObject	= Assister;
+		Payload.ContextHandle	= DamageEffectSpec.GetEffectContext();
+		Payload.InstigatorTags	= *DamageEffectSpec.CapturedSourceTags.GetAggregatedTags();
+		Payload.TargetTags		= *DamageEffectSpec.CapturedTargetTags.GetAggregatedTags();
+		Payload.EventMagnitude	= DamageMagnitude;
+
+		auto NewScopedWindow{ FScopedPredictionWindow(AbilitySystemComponent, true) };
+		AbilitySystemComponent->HandleGameplayEvent(Payload.EventTag, &Payload);
+	}
+
+	// Send messages to other systems through GameplayMessageSubsystem
+
+	{
+		FOutOfHealthMessage Message;
+		Message.Instigator	= DamageInstigator;
+		Message.Causer		= DamageCauser;
+		Message.Assister	= Assister;
+		Message.SourceTags	= *DamageEffectSpec.CapturedSourceTags.GetAggregatedTags();
+		Message.TargetTags	= *DamageEffectSpec.CapturedTargetTags.GetAggregatedTags();
+		Message.Damage		= DamageMagnitude;
+
+		auto& MessageSystem{ UGameplayMessageSubsystem::Get(GetWorld()) };
+		MessageSystem.BroadcastMessage(TAG_Message_OutOfHealth, Message);
+	}
 
 }
 
 void UHealthComponent::HandleOnDamaged(AActor* DamageInstigator, AActor* DamageCauser, const FGameplayEffectSpec& DamageEffectSpec, float DamageMagnitude)
 {
+	// Sends a GameplayEvent to the AbilitySystemComponent of the Actor that owns this component.
 
+	if (AbilitySystemComponent)
+	{
+		FGameplayEventData Payload;
+		Payload.EventTag		= TAG_Event_Damage;
+		Payload.Instigator		= DamageInstigator;
+		Payload.Target			= AbilitySystemComponent->GetAvatarActor();
+		Payload.ContextHandle	= DamageEffectSpec.GetEffectContext();
+		Payload.InstigatorTags	= *DamageEffectSpec.CapturedSourceTags.GetAggregatedTags();
+		Payload.TargetTags		= *DamageEffectSpec.CapturedTargetTags.GetAggregatedTags();
+		Payload.EventMagnitude	= DamageMagnitude;
+
+		auto NewScopedWindow{ FScopedPredictionWindow(AbilitySystemComponent, true) };
+		AbilitySystemComponent->HandleGameplayEvent(Payload.EventTag, &Payload);
+	}
+
+	// Send messages to other systems through GameplayMessageSubsystem
+
+	{
+		FHealthDamageMessage Message;
+		Message.Instigator	= DamageInstigator;
+		Message.Causer		= DamageCauser;
+		Message.SourceTags	= *DamageEffectSpec.CapturedSourceTags.GetAggregatedTags();
+		Message.TargetTags	= *DamageEffectSpec.CapturedTargetTags.GetAggregatedTags();
+		Message.Damage		= DamageMagnitude;
+
+		auto& MessageSystem{ UGameplayMessageSubsystem::Get(GetWorld()) };
+		MessageSystem.BroadcastMessage(TAG_Message_Damage, Message);
+	}
+
+	AddDamageCauser(DamageCauser, DamageMagnitude);
 }
 
 void UHealthComponent::HandleOnHealed(AActor* HealInstigator, AActor* HealCauser, const FGameplayEffectSpec& HealEffectSpec, float HealMagnitude)
 {
+	// Sends a GameplayEvent to the AbilitySystemComponent of the Actor that owns this component.
 
+	if (AbilitySystemComponent)
+	{
+		FGameplayEventData Payload;
+		Payload.EventTag		= TAG_Event_Heal;
+		Payload.Instigator		= HealInstigator;
+		Payload.Target			= AbilitySystemComponent->GetAvatarActor();
+		Payload.ContextHandle	= HealEffectSpec.GetEffectContext();
+		Payload.InstigatorTags	= *HealEffectSpec.CapturedSourceTags.GetAggregatedTags();
+		Payload.TargetTags		= *HealEffectSpec.CapturedTargetTags.GetAggregatedTags();
+		Payload.EventMagnitude	= HealMagnitude;
+
+		auto NewScopedWindow{ FScopedPredictionWindow(AbilitySystemComponent, true) };
+		AbilitySystemComponent->HandleGameplayEvent(Payload.EventTag, &Payload);
+	}
+
+	// Send messages to other systems through GameplayMessageSubsystem
+
+	{
+		FHealthHealMessage Message;
+		Message.Instigator	= HealInstigator;
+		Message.Causer		= HealCauser;
+		Message.SourceTags	= *HealEffectSpec.CapturedSourceTags.GetAggregatedTags();
+		Message.TargetTags	= *HealEffectSpec.CapturedTargetTags.GetAggregatedTags();
+		Message.Heal		= HealMagnitude;
+
+		auto& MessageSystem{ UGameplayMessageSubsystem::Get(GetWorld()) };
+		MessageSystem.BroadcastMessage(TAG_Message_Heal, Message);
+	}
+
+	ClearDamageCauserHistory();
 }
 
 

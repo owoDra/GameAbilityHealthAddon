@@ -84,18 +84,14 @@ void UHealthAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCall
 
 		if (DamageRemaing > 0.0f)
 		{
-			//FBEVerbMessage Message;
-			//Message.Verb = TAG_Message_Damage;
-			//Message.Instigator = Data.EffectSpec.GetEffectContext().GetEffectCauser();
-			//Message.InstigatorTags = *Data.EffectSpec.CapturedSourceTags.GetAggregatedTags();
-			//Message.Target = GetOwningActor();
-			//Message.TargetTags = *Data.EffectSpec.CapturedTargetTags.GetAggregatedTags();
-			////@TODO: Fill out context tags, and any non-ability-system source/instigator tags
-			////@TODO: Determine if it's an opposing team kill, self-own, team kill, etc...
-			//Message.Magnitude = Data.EvaluatedData.Magnitude;
+			if (OnDamaged.IsBound())
+			{
+				const auto& EffectContext{ Data.EffectSpec.GetEffectContext() };
+				auto* Instigator{ EffectContext.GetOriginalInstigator() };
+				auto* Causer{ EffectContext.GetEffectCauser() };
 
-			//UGameplayMessageSubsystem& MessageSystem = UGameplayMessageSubsystem::Get(GetWorld());
-			//MessageSystem.BroadcastMessage(Message.Verb, Message);
+				OnDamaged.Broadcast(Instigator, Causer, Data.EffectSpec, DamageRemaing);
+			}
 			
 			while (DamageRemaing > 0)
 			{
@@ -158,6 +154,15 @@ void UHealthAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCall
 
 		if (HealRemaing > 0.0f)
 		{
+			if (OnHealed.IsBound())
+			{
+				const auto& EffectContext{ Data.EffectSpec.GetEffectContext() };
+				auto* Instigator{ EffectContext.GetOriginalInstigator() };
+				auto* Causer{ EffectContext.GetEffectCauser() };
+
+				OnHealed.Broadcast(Instigator, Causer, Data.EffectSpec, HealRemaing);
+			}
+
 			while (HealRemaing > 0)
 			{
 				auto HealingBuffer{ 0.0f };

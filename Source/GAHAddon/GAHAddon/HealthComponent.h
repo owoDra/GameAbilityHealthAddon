@@ -106,6 +106,30 @@ public:
 
 protected:
 	//
+	// List of damaged opponents and amount of damage
+	//
+	TMap<TSoftObjectPtr<AActor>, float> DamageCauserHistory;
+
+protected:
+	/**
+	 * Add the Actor who has done the damage.
+	 */
+	void AddDamageCauser(AActor* Causer, float Damage);
+
+	/**
+	 * Clear damage causer history
+	 */
+	void ClearDamageCauserHistory();
+
+private:
+	/**
+	 * Returns the actor who contributed the most, excluding the actor who did the last damage
+	 */
+	AActor* GetTopAssistCauser(AActor* FinalCauser) const;
+
+
+protected:
+	//
 	// Current death state
 	//
 	UPROPERTY(ReplicatedUsing = OnRep_DeathState)
