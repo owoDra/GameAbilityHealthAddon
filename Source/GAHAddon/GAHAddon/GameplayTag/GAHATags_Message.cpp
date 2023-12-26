@@ -1,4 +1,4 @@
-// Copyright owoDra
+// Copyright (C) 2023 owoDra
 
 #include "GAHATags_Message.h"
 

@@ -1,4 +1,4 @@
-// Copyright owoDra
+// Copyright (C) 2023 owoDra
 
 #pragma once
 
