@@ -6,6 +6,8 @@
 
 #include "HealthData.generated.h"
 
+class UGameplayAbility_Death;
+
 
 /**
  * The data of the maximum default health and the amount of shield.
@@ -35,5 +37,8 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	float Shield{ 50.0f };
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TSubclassOf<UGameplayAbility_Death> DeathEventAbilityClass;
 
 };

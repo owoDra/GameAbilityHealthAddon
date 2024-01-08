@@ -1,8 +1,10 @@
-// Copyright (C) 2023 owoDra
+﻿// Copyright (C) 2023 owoDra
 
 #pragma once
 
 #include "Component/GFCActorComponent.h"
+
+#include "GameplayAbilitySpec.h"
 
 #include "HealthComponent.generated.h"
 
@@ -63,6 +65,9 @@ protected:
 
 	UPROPERTY(Transient)
 	TObjectPtr<const UCombatAttributeSet> CombatSet{ nullptr };
+
+	UPROPERTY(Transient)
+	FGameplayAbilitySpecHandle DeathAbilitySpecHandle;
 
 protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -137,8 +142,9 @@ protected:
 
 protected:
 	UFUNCTION()
-	virtual void OnRep_DeathState();
+	virtual void OnRep_DeathState(EDeathState OldDeathState);
 
+public:
 	/**
 	 * Executed when the death process is started
 	 */
@@ -150,22 +156,6 @@ protected:
 	virtual void HandleFinishDeath();
 
 public:
-	/**
-	 * Start death process
-	 * 
-	 * Note:
-	 *  Authority required
-	 */
-	virtual void StartDeath();
-
-	/**
-	 * Finish death process
-	 * 
-	 * Note:
-	 *  Authority required
-	 */
-	virtual void FinishDeath();
-
 	/**
 	 * Returns current death state
 	 */

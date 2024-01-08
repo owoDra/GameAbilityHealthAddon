@@ -1,4 +1,4 @@
-// Copyright (C) 2023 owoDra
+﻿// Copyright (C) 2023 owoDra
 
 using UnrealBuildTool;
 
@@ -26,6 +26,7 @@ public class GAHAddon : ModuleRules
                 "ModularGameplay",
                 "GameplayTags",
                 "GameplayAbilities",
+                "NetCore",
                 "GFCore",
             }
         );

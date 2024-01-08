@@ -1,6 +1,6 @@
 // Copyright (C) 2023 owoDra
 
-#include "GAHATags_GameplayEvent.h"
+#include "GAHATags_Event.h"
 
 
 ////////////////////////////////////

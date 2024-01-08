@@ -1,4 +1,4 @@
-// Copyright (C) 2023 owoDra
+﻿// Copyright (C) 2023 owoDra
 
 #include "HealthComponent.h"
 
@@ -8,7 +8,7 @@
 #include "Message/HealthMessageTypes.h"
 #include "GameplayTag/GAHATags_Status.h"
 #include "GameplayTag/GAHATags_Message.h"
-#include "GameplayTag/GAHATags_GameplayEvent.h"
+#include "GameplayTag/GAHATags_Event.h"
 #include "GAHAddonLogs.h"
 
 #include "GAEAbilitySystemComponent.h"
@@ -16,11 +16,12 @@
 #include "Message/GameplayMessageSubsystem.h"
 #include "InitState/InitStateTags.h"
 
-#include "AbilitySystemGlobals.h"
+#include "Net/UnrealNetwork.h"
+#include "Net/Core/PushModel/PushModel.h"
 #include "Components/GameFrameworkComponentManager.h"
 #include "GameplayEffect.h"
 #include "GameplayEffectExtension.h"
-#include "Net/UnrealNetwork.h"
+#include "AbilitySystemGlobals.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(HealthComponent)
 
@@ -53,7 +54,12 @@ void UHealthComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(UHealthComponent, DeathState);
-	DOREPLIFETIME(UHealthComponent, HealthData);
+
+	FDoRepLifetimeParams Params;
+	Params.bIsPushBased = true;
+	Params.Condition = COND_None;
+
+	DOREPLIFETIME_WITH_PARAMS_FAST(UHealthComponent, HealthData, Params);
 }
 
 
@@ -134,13 +140,18 @@ void UHealthComponent::UninitializeFromAbilitySystem()
 
 	if (AbilitySystemComponent)
 	{
+		if (DeathAbilitySpecHandle.IsValid())
+		{
+			AbilitySystemComponent->CancelAbilityHandle(DeathAbilitySpecHandle);
+			AbilitySystemComponent->ClearAbility(DeathAbilitySpecHandle);
+		}
+
 		AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(UHealthAttributeSet::GetHealthAttribute()).RemoveAll(this);
 		AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(UHealthAttributeSet::GetMaxHealthAttribute()).RemoveAll(this);
 		AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(UHealthAttributeSet::GetMinHealthAttribute()).RemoveAll(this);
 		AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(UHealthAttributeSet::GetExtraHealthAttribute()).RemoveAll(this);
 		AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(UHealthAttributeSet::GetShieldAttribute()).RemoveAll(this);
 		AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(UHealthAttributeSet::GetMaxShieldAttribute()).RemoveAll(this);
-
 	}
 
 	AbilitySystemComponent = nullptr;
@@ -221,6 +232,19 @@ void UHealthComponent::ApplyHealthData()
 	AbilitySystemComponent->SetNumericAttributeBase(UHealthAttributeSet::GetMaxShieldAttribute(), HealthData->MaxShield);
 	AbilitySystemComponent->SetNumericAttributeBase(UHealthAttributeSet::GetShieldAttribute(), HealthData->Shield);
 
+	if (auto DeathAbilityClass{ HealthData->DeathEventAbilityClass })
+	{
+		auto* AbilityCDO{ DeathAbilityClass.GetDefaultObject() };
+		auto AbilitySpec{ FGameplayAbilitySpec(AbilityCDO, 1) };
+		AbilitySpec.SourceObject = this;
+
+		DeathAbilitySpecHandle = AbilitySystemComponent->GiveAbility(AbilitySpec);
+	}
+	else
+	{
+		UE_LOG(LogGAHA, Warning, TEXT("UHealthComponent::ApplyHealthData: DeathEventAbilityClass is not set in HealthData(%s). If you want to implement a character death event, you need to set."), *GetNameSafe(HealthData));
+	}
+
 	ClearGameplayTags();
 
 	// Broadcast delegates
@@ -242,6 +266,8 @@ void UHealthComponent::SetHealthData(const UHealthData* NewHealthData)
 		if (NewHealthData != HealthData)
 		{
 			HealthData = NewHealthData;
+
+			MARK_PROPERTY_DIRTY_FROM_NAME(ThisClass, HealthData, this);
 
 			CheckDefaultInitialization();
 		}
@@ -281,84 +307,98 @@ AActor* UHealthComponent::GetTopAssistCauser(AActor* FinalCauser) const
 }
 
 
-void UHealthComponent::OnRep_DeathState()
+void UHealthComponent::OnRep_DeathState(EDeathState OldDeathState)
 {
-	switch (DeathState)
-	{
-	case EDeathState::DeathStarted:
-		HandleStartDeath();
-		break;
+	const auto NewDeathState{ DeathState };
 
-	case EDeathState::DeathFinished:
-		HandleFinishDeath();
-		break;
+	// Revert the death state for now since we rely on StartDeath and FinishDeath to change it.
+
+	DeathState = OldDeathState;
+
+	// The server is trying to set us back but we've already predicted past the server state.
+
+	if (OldDeathState > NewDeathState)
+	{
+		UE_LOG(LogGAHA, Warning, TEXT("UHealthComponent: Predicted past server death state [%d] -> [%d] for owner [%s]."), (uint8)OldDeathState, (uint8)NewDeathState, *GetNameSafe(GetOwner()));
+		return;
+	}
+
+	if (OldDeathState == EDeathState::NotDead)
+	{
+		if (NewDeathState == EDeathState::DeathStarted)
+		{
+			HandleStartDeath();
+		}
+		else if (NewDeathState == EDeathState::DeathFinished)
+		{
+			HandleStartDeath();
+			HandleFinishDeath();
+		}
+		else
+		{
+			UE_LOG(LogGAHA, Error, TEXT("UHealthComponent: Invalid death transition [%d] -> [%d] for owner [%s]."), (uint8)OldDeathState, (uint8)NewDeathState, *GetNameSafe(GetOwner()));
+		}
+	}
+	else if (OldDeathState == EDeathState::DeathStarted)
+	{
+		if (NewDeathState == EDeathState::DeathFinished)
+		{
+			HandleFinishDeath();
+		}
+		else
+		{
+			UE_LOG(LogGAHA, Error, TEXT("UHealthComponent: Invalid death transition [%d] -> [%d] for owner [%s]."), (uint8)OldDeathState, (uint8)NewDeathState, *GetNameSafe(GetOwner()));
+		}
+	}
+
+	if (DeathState != NewDeathState)
+	{
+		UE_LOG(LogGAHA, Error, TEXT("UHealthComponent: Death transition failed [%d] -> [%d] for owner [%s]."), (uint8)OldDeathState, (uint8)NewDeathState, *GetNameSafe(GetOwner()));
 	}
 }
 
 void UHealthComponent::HandleStartDeath()
 {
+	if (DeathState != EDeathState::NotDead)
+	{
+		return;
+	}
+
+	DeathState = EDeathState::DeathStarted;
+
+	if (AbilitySystemComponent)
+	{
+		AbilitySystemComponent->SetLooseGameplayTagCount(TAG_Status_Death_Dying, 1);
+	}
+
 	auto* Owner{ GetOwner() };
 	check(Owner);
 
-	if (Owner->HasAuthority())
-	{
-		if (AbilitySystemComponent)
-		{
-			AbilitySystemComponent->SetLooseGameplayTagCount(TAG_Status_Death_Dying, 1);
-		}
-	}
-
 	OnDeathStarted.Broadcast(Owner);
+
+	Owner->ForceNetUpdate();
 }
 
 void UHealthComponent::HandleFinishDeath()
 {
+	if (DeathState != EDeathState::DeathStarted)
+	{
+		return;
+	}
+
+	DeathState = EDeathState::DeathFinished;
+
+	if (AbilitySystemComponent)
+	{
+		AbilitySystemComponent->SetLooseGameplayTagCount(TAG_Status_Death_Dead, 1);
+	}
+
 	auto* Owner{ GetOwner() };
 	check(Owner);
 
-	if (Owner->HasAuthority())
-	{
-		if (AbilitySystemComponent)
-		{
-			AbilitySystemComponent->SetLooseGameplayTagCount(TAG_Status_Death_Dead, 1);
-		}
-	}
-
 	OnDeathFinished.Broadcast(Owner);
-}
 
-void UHealthComponent::StartDeath()
-{
-	auto* Owner{ GetOwner() };
-
-	if (Owner->HasAuthority())
-	{
-		if (DeathState == EDeathState::NotDead)
-		{
-			DeathState = EDeathState::DeathStarted;
-
-			HandleStartDeath();
-
-			Owner->ForceNetUpdate();
-		}
-	}
-}
-
-void UHealthComponent::FinishDeath()
-{
-	auto* Owner{ GetOwner() };
-
-	if (Owner->HasAuthority())
-	{
-		if (DeathState == EDeathState::DeathStarted)
-		{
-			DeathState = EDeathState::DeathFinished;
-
-			HandleFinishDeath();
-
-			Owner->ForceNetUpdate();
-		}
-	}
+	Owner->ForceNetUpdate();
 }
 
 
