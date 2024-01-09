@@ -28,6 +28,7 @@ public class GAHAddon : ModuleRules
                 "GameplayAbilities",
                 "NetCore",
                 "GFCore",
+                "UMG",
             }
         );
 
