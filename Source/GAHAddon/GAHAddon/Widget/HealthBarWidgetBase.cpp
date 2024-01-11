@@ -99,13 +99,13 @@ void UHealthBarWidgetBase::RefreshHealthValues()
 		const auto MaxShield{ HealthComponent->GetMaxShield() };
 		OnMaxShieldChanged(MaxShield, MaxShield);
 
-		if (Health > 0.0f)
+		if (HealthComponent->IsDeadOrDying())
 		{
-			OnRevive();
+			OnDeath();
 		}
 		else
 		{
-			OnDeath();
+			OnRevive();
 		}
 	}
 }

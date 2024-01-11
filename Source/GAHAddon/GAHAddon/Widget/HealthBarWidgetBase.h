@@ -34,7 +34,7 @@ private:
 
 
 protected:
-	UPROPERTY(BlueprintReadOnly, Transient, VisibleAnywhere, Category = "Components")
+	UPROPERTY(BlueprintReadOnly, Transient, Category = "Components")
 	TWeakObjectPtr<UHealthComponent> HealthComponent;
 
 protected:
