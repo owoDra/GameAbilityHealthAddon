@@ -140,11 +140,7 @@ void UHealthComponent::UninitializeFromAbilitySystem()
 
 	if (AbilitySystemComponent)
 	{
-		if (DeathAbilitySpecHandle.IsValid())
-		{
-			AbilitySystemComponent->CancelAbilityHandle(DeathAbilitySpecHandle);
-			AbilitySystemComponent->ClearAbility(DeathAbilitySpecHandle);
-		}
+		RemoveDeathAbilityFromSystem();
 
 		AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(UHealthAttributeSet::GetHealthAttribute()).RemoveAll(this);
 		AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(UHealthAttributeSet::GetMaxHealthAttribute()).RemoveAll(this);
@@ -207,7 +203,7 @@ void UHealthComponent::HandleChangeInitStateToDataInitialized(UGameFrameworkComp
 
 void UHealthComponent::OnRep_HealthData()
 {
-	CheckDefaultInitialization();
+	HandleHealthDataUpdated();
 }
 
 void UHealthComponent::ApplyHealthData()
@@ -231,6 +227,8 @@ void UHealthComponent::ApplyHealthData()
 
 	AbilitySystemComponent->SetNumericAttributeBase(UHealthAttributeSet::GetMaxShieldAttribute(), HealthData->MaxShield);
 	AbilitySystemComponent->SetNumericAttributeBase(UHealthAttributeSet::GetShieldAttribute(), HealthData->Shield);
+
+	RemoveDeathAbilityFromSystem();
 
 	if (auto DeathAbilityClass{ HealthData->DeathEventAbilityClass })
 	{
@@ -259,6 +257,30 @@ void UHealthComponent::ApplyHealthData()
 	OnMaxShieldChanged.Broadcast(this, HealthSet->GetMaxShield(), HealthSet->GetMaxShield(), nullptr);
 }
 
+void UHealthComponent::HandleHealthDataUpdated()
+{
+	if (HasReachedInitState(TAG_InitState_DataInitialized))
+	{
+		ApplyHealthData();
+	}
+	else
+	{
+		CheckDefaultInitialization();
+	}
+}
+
+void UHealthComponent::RemoveDeathAbilityFromSystem()
+{
+	if (AbilitySystemComponent)
+	{
+		if (DeathAbilitySpecHandle.IsValid())
+		{
+			AbilitySystemComponent->CancelAbilityHandle(DeathAbilitySpecHandle);
+			AbilitySystemComponent->ClearAbility(DeathAbilitySpecHandle);
+		}
+	}
+}
+
 void UHealthComponent::SetHealthData(const UHealthData* NewHealthData)
 {
 	if (GetOwner()->HasAuthority())
@@ -269,7 +291,7 @@ void UHealthComponent::SetHealthData(const UHealthData* NewHealthData)
 
 			MARK_PROPERTY_DIRTY_FROM_NAME(ThisClass, HealthData, this);
 
-			CheckDefaultInitialization();
+			HandleHealthDataUpdated();
 		}
 	}
 }

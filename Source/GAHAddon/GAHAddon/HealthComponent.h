@@ -101,6 +101,16 @@ protected:
 	 */
 	virtual void ApplyHealthData();
 
+	/**
+	 * Calls when health data set or changed
+	 */
+	virtual void HandleHealthDataUpdated();
+
+	/**
+	 * Remove registered death abilities from the abilities system
+	 */
+	virtual void RemoveDeathAbilityFromSystem();
+
 public:
 	/**
 	 * Set the current health data
