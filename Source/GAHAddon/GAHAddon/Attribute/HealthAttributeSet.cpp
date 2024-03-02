@@ -1,4 +1,4 @@
-// Copyright (C) 2024 owoDra
+﻿// Copyright (C) 2024 owoDra
 
 #include "HealthAttributeSet.h"
 
@@ -83,16 +83,7 @@ void UHealthAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCall
 		// Skip if damage amount is less than 0
 
 		if (DamageRemaing > 0.0f)
-		{
-			if (OnDamaged.IsBound())
-			{
-				const auto& EffectContext{ Data.EffectSpec.GetEffectContext() };
-				auto* Instigator{ EffectContext.GetOriginalInstigator() };
-				auto* Causer{ EffectContext.GetEffectCauser() };
-
-				OnDamaged.Broadcast(Instigator, Causer, Data.EffectSpec, DamageRemaing);
-			}
-			
+		{	
 			while (DamageRemaing > 0)
 			{
 				auto DamageBuffer{ 0.0f };
@@ -154,15 +145,6 @@ void UHealthAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCall
 
 		if (HealRemaing > 0.0f)
 		{
-			if (OnHealed.IsBound())
-			{
-				const auto& EffectContext{ Data.EffectSpec.GetEffectContext() };
-				auto* Instigator{ EffectContext.GetOriginalInstigator() };
-				auto* Causer{ EffectContext.GetEffectCauser() };
-
-				OnHealed.Broadcast(Instigator, Causer, Data.EffectSpec, HealRemaing);
-			}
-
 			while (HealRemaing > 0)
 			{
 				auto HealingBuffer{ 0.0f };

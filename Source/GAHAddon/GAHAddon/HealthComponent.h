@@ -121,30 +121,6 @@ public:
 
 protected:
 	//
-	// List of damaged opponents and amount of damage
-	//
-	TMap<TSoftObjectPtr<AActor>, float> DamageCauserHistory;
-
-protected:
-	/**
-	 * Add the Actor who has done the damage.
-	 */
-	void AddDamageCauser(AActor* Causer, float Damage);
-
-	/**
-	 * Clear damage causer history
-	 */
-	void ClearDamageCauserHistory();
-
-private:
-	/**
-	 * Returns the actor who contributed the most, excluding the actor who did the last damage
-	 */
-	AActor* GetTopAssistCauser(AActor* FinalCauser) const;
-
-
-protected:
-	//
 	// Current death state
 	//
 	UPROPERTY(ReplicatedUsing = OnRep_DeathState)
@@ -213,8 +189,8 @@ protected:
 	virtual void HandleMaxShieldChanged(const FOnAttributeChangeData& ChangeData);
 
 	virtual void HandleOutOfHealth(AActor* DamageInstigator, AActor* DamageCauser, const FGameplayEffectSpec& DamageEffectSpec, float DamageMagnitude);
-	virtual void HandleOnDamaged(AActor* DamageInstigator, AActor* DamageCauser, const FGameplayEffectSpec& DamageEffectSpec, float DamageMagnitude);
-	virtual void HandleOnHealed(AActor* HealInstigator, AActor* HealCauser, const FGameplayEffectSpec& HealEffectSpec, float HealMagnitude);
+	virtual void HandleOnDamaged(const FOnAttributeChangeData& ChangeData);
+	virtual void HandleOnHealed(const FOnAttributeChangeData& ChangeData);
 	
 public:
 	UFUNCTION(BlueprintCallable, Category = "Health")

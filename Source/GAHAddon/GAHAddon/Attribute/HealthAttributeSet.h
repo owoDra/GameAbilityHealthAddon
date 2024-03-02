@@ -1,4 +1,4 @@
-// Copyright (C) 2024 owoDra
+﻿// Copyright (C) 2024 owoDra
 
 #pragma once
 
@@ -37,17 +37,7 @@ protected:
 
 public:
 	//
-	// Delegate to broadcast when damage is taken.
-	//
-	mutable FAttributeEvent OnDamaged;
-
-	//
 	// Delegate to broadcast when a heal is received
-	//
-	mutable FAttributeEvent OnHealed;
-
-	//
-	// Delegate to broadcast when the health attribute reaches zero
 	//
 	mutable FAttributeEvent OnOutOfHealth;
 
@@ -56,7 +46,6 @@ private:
 	// Used to track when the health reaches 0.
 	//
 	bool bOutOfHealth{ false };
-
 
 public:
 	ATTRIBUTE_ACCESSORS(UHealthAttributeSet, Health);
