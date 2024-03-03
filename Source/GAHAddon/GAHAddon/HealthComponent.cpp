@@ -5,6 +5,8 @@
 #include "Attribute/HealthAttributeSet.h"
 #include "Attribute/CombatAttributeSet.h"
 #include "HealthData.h"
+#include "Message/HealthMessageTypes.h"
+#include "GameplayTag/GAHATags_Message.h"
 #include "GameplayTag/GAHATags_Status.h"
 #include "GameplayTag/GAHATags_Event.h"
 #include "GAHAddonLogs.h"
@@ -456,6 +458,20 @@ void UHealthComponent::HandleOutOfHealth(AActor* DamageInstigator, AActor* Damag
 
 		auto NewScopedWindow{ FScopedPredictionWindow(AbilitySystemComponent, true) };
 		AbilitySystemComponent->HandleGameplayEvent(Payload.EventTag, &Payload);
+	}
+
+	// Send messages to other systems through GameplayMessageSubsystem
+
+	{
+		FOutOfHealthMessage Message;
+		Message.Instigator = DamageInstigator;
+		Message.Causer = DamageCauser;
+		Message.SourceTags = *DamageEffectSpec.CapturedSourceTags.GetAggregatedTags();
+		Message.TargetTags = *DamageEffectSpec.CapturedTargetTags.GetAggregatedTags();
+		Message.Damage = DamageMagnitude;
+
+		auto& MessageSystem{ UGameplayMessageSubsystem::Get(GetWorld()) };
+		MessageSystem.BroadcastMessage(TAG_Message_OutOfHealth, Message);
 	}
 }
 
