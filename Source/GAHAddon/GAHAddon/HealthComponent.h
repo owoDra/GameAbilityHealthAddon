@@ -188,6 +188,7 @@ protected:
 	virtual void HandleShieldChanged(const FOnAttributeChangeData& ChangeData);
 	virtual void HandleMaxShieldChanged(const FOnAttributeChangeData& ChangeData);
 
+public:
 	virtual void HandleOutOfHealth(AActor* DamageInstigator, AActor* DamageCauser, const FGameplayEffectSpec& DamageEffectSpec, float DamageMagnitude);
 	virtual void HandleOnDamaged(const FOnAttributeChangeData& ChangeData);
 	virtual void HandleOnHealed(const FOnAttributeChangeData& ChangeData);
