@@ -1,4 +1,4 @@
-// Copyright (C) 2024 owoDra
+﻿// Copyright (C) 2024 owoDra
 
 #pragma once
 
@@ -11,7 +11,7 @@ struct FGameplayEffectCustomExecutionParameters;
  * Base class for additional computational processing that can be used in HealExecution or DamageExecution
  */
 UCLASS(BlueprintType, Const, DefaultToInstanced, EditInlineNew)
-class UHealthExecutionModifier : public UObject
+class GAHADDON_API UHealthExecutionModifier : public UObject
 {
 	GENERATED_BODY()
 public:
