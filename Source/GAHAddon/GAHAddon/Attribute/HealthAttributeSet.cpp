@@ -221,21 +221,25 @@ void UHealthAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCall
 
 	//  If Health is less than 0.0, Death is indicated.
 
-	const auto bIsZeroHealth{ GetHealth() <= 0.0f };
-
-	if (bIsZeroHealth && !bOutOfHealth)
+	if ((Data.EvaluatedData.Attribute == GetHealthAttribute()) ||
+		(Data.EvaluatedData.Attribute == GetDamageAttribute()))
 	{
-		if (OnOutOfHealth.IsBound())
+		const auto bIsZeroHealth{ GetHealth() <= 0.0f };
+
+		if (bIsZeroHealth && !bOutOfHealth)
 		{
-			const auto& EffectContext{ Data.EffectSpec.GetEffectContext() };
-			auto* Instigator{ EffectContext.GetOriginalInstigator() };
-			auto* Causer{ EffectContext.GetEffectCauser() };
+			if (OnOutOfHealth.IsBound())
+			{
+				const auto& EffectContext{ Data.EffectSpec.GetEffectContext() };
+				auto* Instigator{ EffectContext.GetOriginalInstigator() };
+				auto* Causer{ EffectContext.GetEffectCauser() };
 
-			OnOutOfHealth.Broadcast(Instigator, Causer, Data.EffectSpec, Data.EvaluatedData.Magnitude);
+				OnOutOfHealth.Broadcast(Instigator, Causer, Data.EffectSpec, Data.EvaluatedData.Magnitude);
+			}
 		}
-	}
 
-	bOutOfHealth = bIsZeroHealth;
+		bOutOfHealth = bIsZeroHealth;
+	}
 }
 
 void UHealthAttributeSet::PreAttributeBaseChange(const FGameplayAttribute& Attribute, float& NewValue) const
