@@ -22,6 +22,11 @@ struct FOnAttributeChangeData;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDeathDelegate, AActor*, OwningActor);
 
 /**
+ * Delegate for actor's damage or health events
+ */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FTotalHealthChangeDelegate, UHealthComponent*, HealthComponent, float, Value);
+
+/**
  * Delegate used to notify that the value of an attribute, such as actor health, has changed
  */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FOnHealthAttributeChangedDelegate, UHealthComponent*, HealthComponent, float, OldValue, float, NewValue, AActor*, Instigator);
@@ -175,10 +180,23 @@ public:
 	FOnHealthAttributeChangedDelegate OnMaxShieldChanged;
 
 	UPROPERTY(BlueprintAssignable)
+	FTotalHealthChangeDelegate OnDamage;
+
+	UPROPERTY(BlueprintAssignable)
+	FTotalHealthChangeDelegate OnHeal;
+
+	UPROPERTY(BlueprintAssignable)
 	FOnDeathDelegate OnDeathStarted;
 
 	UPROPERTY(BlueprintAssignable)
 	FOnDeathDelegate OnDeathFinished;
+
+protected:
+	UPROPERTY(Transient)
+	FTimerHandle DamageNotifyTimer;
+
+	UPROPERTY(Transient)
+	FTimerHandle HealNotifyTimer;
 
 protected:
 	virtual void HandleHealthChanged(const FOnAttributeChangeData& ChangeData);
@@ -192,6 +210,9 @@ public:
 	virtual void HandleOutOfHealth(AActor* DamageInstigator, AActor* DamageCauser, const FGameplayEffectSpec& DamageEffectSpec, float DamageMagnitude);
 	virtual void HandleOnDamaged(const FOnAttributeChangeData& ChangeData);
 	virtual void HandleOnHealed(const FOnAttributeChangeData& ChangeData);
+
+	virtual void HandleNotifyDamage(float PrevTotalHealth);
+	virtual void HandleNotifyHeal(float PrevTotalHealth);
 	
 public:
 	UFUNCTION(BlueprintCallable, Category = "Health")

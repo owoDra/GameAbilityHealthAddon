@@ -67,6 +67,19 @@ void UHealthComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	UninitializeFromAbilitySystem();
 
+	if (const auto* World{ GetWorld() })
+	{
+		if (DamageNotifyTimer.IsValid())
+		{
+			World->GetTimerManager().ClearTimer(DamageNotifyTimer);
+		}
+
+		if (HealNotifyTimer.IsValid())
+		{
+			World->GetTimerManager().ClearTimer(HealNotifyTimer);
+		}
+	}
+
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -477,7 +490,35 @@ void UHealthComponent::HandleOutOfHealth(AActor* DamageInstigator, AActor* Damag
 
 void UHealthComponent::HandleOnDamaged(const FOnAttributeChangeData& ChangeData)
 {
-	const auto DamageMagnitude{ ChangeData.OldValue - ChangeData.NewValue };
+	const auto* World{ GetWorld() };
+
+	if (World && !DamageNotifyTimer.IsValid())
+	{
+		const auto Delta{ ChangeData.NewValue - ChangeData.OldValue };
+		const auto PrevTotalHealth{ GetTotalHealth() - Delta };
+
+		DamageNotifyTimer = World->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateUObject(this, &ThisClass::HandleNotifyDamage, PrevTotalHealth));
+	}
+}
+
+void UHealthComponent::HandleOnHealed(const FOnAttributeChangeData& ChangeData)
+{
+	const auto* World{ GetWorld() };
+
+	if (World && !HealNotifyTimer.IsValid())
+	{
+		const auto Delta{ ChangeData.NewValue - ChangeData.OldValue };
+		const auto PrevTotalHealth{ GetTotalHealth() + Delta };
+
+		HealNotifyTimer = World->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateUObject(this, &ThisClass::HandleNotifyHeal, PrevTotalHealth));
+	}
+}
+
+void UHealthComponent::HandleNotifyDamage(float PrevTotalHealth)
+{
+	DamageNotifyTimer.Invalidate();
+
+	const auto DamageMagnitude{ PrevTotalHealth - GetTotalHealth() };
 
 	// Sends a GameplayEvent to the AbilitySystemComponent of the Actor that owns this component.
 
@@ -496,25 +537,14 @@ void UHealthComponent::HandleOnDamaged(const FOnAttributeChangeData& ChangeData)
 		AbilitySystemComponent->HandleGameplayEvent(Payload.EventTag, &Payload);
 	}
 
-	// Send messages to other systems through GameplayMessageSubsystem
-
-	//{
-	//	FHealthDamageMessage Message;
-	//	Message.Instigator = AbilitySystemComponent->GetAvatarActor();
-	//	//Message.Causer = DamageCauser;
-	//	//Message.SourceTags = *DamageEffectSpec.CapturedSourceTags.GetAggregatedTags();
-	//	//Message.TargetTags = *DamageEffectSpec.CapturedTargetTags.GetAggregatedTags();
-	//	Message.Damage = DamageMagnitude;
-	//	Message.Type = Type;
-
-	//	auto& MessageSystem{ UGameplayMessageSubsystem::Get(GetWorld()) };
-	//	MessageSystem.BroadcastMessage(TAG_Message_Damage, Message);
-	//}
+	OnDamage.Broadcast(this, DamageMagnitude);
 }
 
-void UHealthComponent::HandleOnHealed(const FOnAttributeChangeData& ChangeData)
+void UHealthComponent::HandleNotifyHeal(float PrevTotalHealth)
 {
-	const auto HealMagnitude{ ChangeData.OldValue - ChangeData.NewValue };
+	HealNotifyTimer.Invalidate();
+
+	const auto HealMagnitude{ GetTotalHealth() - PrevTotalHealth };
 
 	// Sends a GameplayEvent to the AbilitySystemComponent of the Actor that owns this component.
 
@@ -533,20 +563,7 @@ void UHealthComponent::HandleOnHealed(const FOnAttributeChangeData& ChangeData)
 		AbilitySystemComponent->HandleGameplayEvent(Payload.EventTag, &Payload);
 	}
 
-	// Send messages to other systems through GameplayMessageSubsystem
-
-	//{
-	//	FHealthHealMessage Message;
-	//	Message.Instigator = AbilitySystemComponent->GetAvatarActor();
-	//	//Message.Causer = HealCauser;
-	//	//Message.SourceTags = *HealEffectSpec.CapturedSourceTags.GetAggregatedTags();
-	//	//Message.TargetTags = *HealEffectSpec.CapturedTargetTags.GetAggregatedTags();
-	//	Message.Heal = HealMagnitude;
-	//	Message.Type = Type;
-
-	//	auto& MessageSystem{ UGameplayMessageSubsystem::Get(GetWorld()) };
-	//	MessageSystem.BroadcastMessage(TAG_Message_Heal, Message);
-	//}
+	OnHeal.Broadcast(this, HealMagnitude);
 }
 
 
